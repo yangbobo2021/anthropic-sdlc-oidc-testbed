@@ -1,0 +1,19 @@
+name: SDLC-0080 AWS sandbox proof
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Issue a GitHub token or exercise a provisioned AWS stack
+        type: choice
+        options: [preflight, aws]
+        default: preflight
+        required: true
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main' && github.ref_protected
+    uses: ./.github/workflows/sdlc0080-aws-probe.yml
+    with:
+      phase: ${{ inputs.phase }}
