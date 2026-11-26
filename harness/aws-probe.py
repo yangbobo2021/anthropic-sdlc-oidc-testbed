@@ -89,17 +89,25 @@ def require_denied(result, code, reason, accepted_codes):
 
 def validate_cli_operations():
     operations = [
-        ("sts", "assume-role-with-web-identity", [], {"RoleArn", "WebIdentityToken"}),
-        ("s3api", "put-object", [], {"Bucket", "Key", "Body"}),
-        ("s3api", "get-object", ["/dev/null"], {"Bucket", "Key"}),
+        ("sts", "assume-role-with-web-identity", {"RoleArn", "WebIdentityToken"}),
+        ("s3api", "put-object", {"Bucket", "Key", "Body"}),
     ]
-    for service, command, arguments, fields in operations:
+    for service, command, fields in operations:
         result = subprocess.run(
-            ["aws", "--no-cli-pager", service, command, *arguments, "--generate-cli-skeleton", "input"],
+            ["aws", "--no-cli-pager", service, command, "--generate-cli-skeleton", "input"],
             capture_output=True, text=True, check=False, timeout=20,
         )
         if result.returncode != 0 or not fields.issubset(json.loads(result.stdout)):
             raise SystemExit(f"AWS CLI could not validate {service} {command}")
+    # The CLI omits skeletons for streaming-output commands such as GetObject.
+    help_result = subprocess.run(
+        ["aws", "--no-cli-pager", "s3api", "get-object", "help"],
+        env={**os.environ, "MANPAGER": "cat", "PAGER": "cat", "GROFF_NO_SGR": "1"},
+        capture_output=True, text=True, check=False, timeout=20,
+    )
+    help_text = re.sub(r".\x08", "", help_result.stdout)
+    if help_result.returncode != 0 or not all(term in help_text for term in ("--bucket", "--key", "outfile")):
+        raise SystemExit(f"AWS CLI could not inspect s3api get-object help, exit={help_result.returncode}")
     return subprocess.check_output(["aws", "--version"], text=True, timeout=20).strip()
 
 
