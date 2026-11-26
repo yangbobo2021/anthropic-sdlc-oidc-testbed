@@ -62,9 +62,10 @@ def aws(service, command, arguments, credentials=None):
         environment.update(AWS_ACCESS_KEY_ID=credentials["AccessKeyId"],
                            AWS_SECRET_ACCESS_KEY=credentials["SecretAccessKey"],
                            AWS_SESSION_TOKEN=credentials["SessionToken"])
+    endpoint_service = "s3" if service == "s3api" else service
     result = subprocess.run(
         ["aws", "--no-cli-pager", "--region", region, "--output", "json",
-         "--endpoint-url", f"https://{service}.{region}.amazonaws.com",
+         "--endpoint-url", f"https://{endpoint_service}.{region}.amazonaws.com",
          "--cli-connect-timeout", "10", "--cli-read-timeout", "20", service, command, *arguments],
         env=environment, capture_output=True, text=True, check=False, timeout=120,
     )
@@ -86,11 +87,28 @@ def require_denied(result, code, reason, accepted_codes):
     return code
 
 
+def validate_cli_operations():
+    operations = [
+        ("sts", "assume-role-with-web-identity", [], {"RoleArn", "WebIdentityToken"}),
+        ("s3api", "put-object", [], {"Bucket", "Key", "Body"}),
+        ("s3api", "get-object", ["/dev/null"], {"Bucket", "Key"}),
+    ]
+    for service, command, arguments, fields in operations:
+        result = subprocess.run(
+            ["aws", "--no-cli-pager", service, command, *arguments, "--generate-cli-skeleton", "input"],
+            capture_output=True, text=True, check=False, timeout=20,
+        )
+        if result.returncode != 0 or not fields.issubset(json.loads(result.stdout)):
+            raise SystemExit(f"AWS CLI could not validate {service} {command}")
+    return subprocess.check_output(["aws", "--version"], text=True, timeout=20).strip()
+
+
 def main():
     token = fetch_token(AUDIENCE)
     claims = claim_summary(token, AUDIENCE)
     report = {"phase": os.environ["PROBE_PHASE"], "claims": claims}
     if report["phase"] == "preflight":
+        report["aws_cli"] = validate_cli_operations()
         print(json.dumps(report))
         return
     if report["phase"] != "aws":
@@ -136,15 +154,15 @@ def main():
         suffix = f"{claims['run_id']}-{os.environ['GITHUB_RUN_ATTEMPT']}.json"
         key = f"deployment-receipts/{suffix}"
         target = temp / "result.json"
-        put, code = aws("s3", "put-object", ["--bucket", bucket, "--key", key, "--body", str(receipt)],
+        put, code = aws("s3api", "put-object", ["--bucket", bucket, "--key", key, "--body", str(receipt)],
                         credentials)
         if put.returncode != 0:
             raise SystemExit(f"Authorized S3 PutObject failed: {code}")
-        read, code = aws("s3", "get-object", ["--bucket", bucket, "--key", key, str(target)],
+        read, code = aws("s3api", "get-object", ["--bucket", bucket, "--key", key, str(target)],
                          credentials)
         if read.returncode != 0 or target.read_bytes() != receipt.read_bytes():
             raise SystemExit(f"Authorized S3 GetObject or payload check failed: {code}")
-        deny, code = aws("s3", "put-object", [
+        deny, code = aws("s3api", "put-object", [
             "--bucket", bucket, "--key", f"unrelated/{suffix}", "--body", str(receipt),
         ], credentials)
         report["s3"] = {"write_and_read": key, "out_of_scope_write":
