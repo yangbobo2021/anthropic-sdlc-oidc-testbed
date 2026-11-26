@@ -1,0 +1,40 @@
+name: Read signed OIDC facts
+on:
+  workflow_call:
+    inputs:
+      case:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+      audience:
+        required: false
+        type: string
+        default: sts.amazonaws.com
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  evaluate:
+    if: >-
+      github.actor == 'yangbobo2021' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected &&
+      (github.repository == 'yangbobo2021/anthropic-sdlc-oidc-testbed' ||
+       github.repository == 'yangbobo2021/anthropic-sdlc-oidc-peer')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: ${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: yangbobo2021/anthropic-sdlc-oidc-testbed
+          ref: refs/heads/main
+          persist-credentials: false
+      - name: Verify issuer and exact policy in isolated OpenBao
+        env:
+          CASE: ${{ inputs.case }}
+          AUDIENCE: ${{ inputs.audience }}
+          EXPECTED_ENVIRONMENT: ${{ inputs.target }}
+        run: bash probe/evaluate.sh

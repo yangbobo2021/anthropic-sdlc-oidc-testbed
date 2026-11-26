@@ -1,0 +1,32 @@
+name: SDLC-0080 custom subject cases
+on: workflow_dispatch
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  valid:
+    uses: ./.github/workflows/verify-oidc.yml
+    with:
+      case: valid
+      target: production
+  wrong-environment:
+    uses: ./.github/workflows/verify-oidc.yml
+    with:
+      case: wrong-environment
+      target: staging
+  wrong-audience:
+    uses: ./.github/workflows/verify-oidc.yml
+    with:
+      case: wrong-audience
+      target: production
+      audience: https://sdlc-oidc-probe.invalid
+  wrong-workflow:
+    uses: ./.github/workflows/other-oidc.yml
+    with:
+      case: wrong-workflow
+      target: production
+  wrong-version:
+    uses: yangbobo2021/anthropic-sdlc-oidc-testbed/.github/workflows/verify-oidc.yml@oidc-alternate
+    with:
+      case: wrong-version
+      target: production

@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::000000000000:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:yangbobo2021@95600496/anthropic-sdlc-oidc-testbed@1472717050:environment:production:job_workflow_ref:yangbobo2021/anthropic-sdlc-oidc-testbed/.github/workflows/verify-oidc.yml@refs/heads/main"
+        }
+      }
+    }
+  ]
+}
