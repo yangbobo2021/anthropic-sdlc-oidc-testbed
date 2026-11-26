@@ -1,0 +1,33 @@
+name: SDLC-0080 real AWS probe
+on:
+  workflow_call:
+    inputs:
+      phase:
+        type: string
+        required: true
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main' && github.ref_protected
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 8
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
+    - name: Verify signed identity and authorization
+      env:
+        PROBE_PHASE: ${{ inputs.phase }}
+        SANDBOX_AWS_REGION: ${{ vars.SDLC_AWS_REGION }}
+        SANDBOX_PROBE_ROLE: ${{ vars.SDLC_PROBE_ROLE }}
+        SANDBOX_PROBE_SUBJECT: ${{ vars.SDLC_PROBE_SUBJECT }}
+        SANDBOX_BUCKET: ${{ vars.SDLC_RECEIPT_BUCKET }}
+        SANDBOX_WRONG_REPOSITORY_ROLE: ${{ vars.SDLC_WRONG_REPOSITORY_ROLE }}
+        SANDBOX_WRONG_ENVIRONMENT_ROLE: ${{ vars.SDLC_WRONG_ENVIRONMENT_ROLE }}
+        SANDBOX_WRONG_WORKFLOW_ROLE: ${{ vars.SDLC_WRONG_WORKFLOW_ROLE }}
+        SANDBOX_WRONG_REF_ROLE: ${{ vars.SDLC_WRONG_REF_ROLE }}
+      run: python3 harness/aws-probe.py
